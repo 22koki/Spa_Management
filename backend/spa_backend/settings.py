@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'spa',
 ]
+AUTH_USER_MODEL = "spa.User"
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -86,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'spa_db',
         'USER': 'postgres',
-        'PASSWORD': 'your_password',
+        'PASSWORD': 'Kor@2020',
         'HOST': 'localhost',
         'PORT': '5432',
     }
