@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createPayment, getBookings, getPayments } from "../api/api";
 import "./Payments.css";
+import { useSearchParams } from "react-router-dom";
 
 export default function Payments() {
+  const [searchParams] = useSearchParams();
   const [payments, setPayments] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [booking, setBooking] = useState("");
+  const [booking, setBooking] = useState(searchParams.get("booking") || "");
   const [method, setMethod] = useState("mpesa");
   const [message, setMessage] = useState("");
 

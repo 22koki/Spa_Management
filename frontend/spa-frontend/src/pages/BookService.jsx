@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { getServices, getTherapists, createBooking } from "../api/api";
+import { useSearchParams } from "react-router-dom";
 
 export default function BookService() {
+  const [searchParams] = useSearchParams();
   const [services, setServices] = useState([]);
   const [therapists, setTherapists] = useState([]);
-  const [serviceId, setServiceId] = useState("");
+  const [serviceId, setServiceId] = useState(searchParams.get("service") || "");
   const [therapistId, setTherapistId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");

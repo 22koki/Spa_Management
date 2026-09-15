@@ -56,7 +56,7 @@ class BookingListCreate(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Booking.objects.select_related('client', 'therapist', 'service')
+        queryset = Booking.objects.select_related('client', 'therapist', 'service', 'payment')
         if user.role == 'admin':
             return queryset
         if user.role == 'therapist':
