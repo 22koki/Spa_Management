@@ -15,6 +15,7 @@ export default function Login({ setToken }) {
         setAuthToken(token);
         setToken(token);
         localStorage.setItem("token", token);
+        localStorage.setItem("refreshToken", res.data.refresh);
         setError("");
       }
     } catch (err) {

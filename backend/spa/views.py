@@ -4,15 +4,25 @@ from .serializers import UserSerializer, ServiceSerializer, BookingSerializer, P
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
 
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and (
+            request.method in ('GET', 'HEAD', 'OPTIONS') or request.user.is_staff or request.user.role == 'admin'
+        ))
+
+class IsSpaAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and (request.user.is_staff or request.user.role == 'admin'))
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def therapist_list(request):
-    therapists = User.objects.filter(role='therapist')
+    therapists = User.objects.filter(role='therapist', is_active=True)
     data = [{'id': t.id, 'username': t.username} for t in therapists]
     return Response(data)
 
@@ -37,6 +47,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
 class ServiceListCreate(generics.ListCreateAPIView):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 # --- Bookings ---
 class BookingListCreate(generics.ListCreateAPIView):
@@ -67,12 +78,31 @@ class BookingListCreate(generics.ListCreateAPIView):
             serializer.save(client=self.request.user, status='pending')
 
 # --- Payments ---
-class PaymentCreate(generics.CreateAPIView):
-    queryset = Payment.objects.all()
+class PaymentCreate(generics.ListCreateAPIView):
     serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Payment.objects.select_related('booking__client', 'booking__therapist', 'booking__service')
+        if user.is_staff or user.role == 'admin':
+            return queryset
+        if user.role == 'therapist':
+            return queryset.filter(booking__therapist=user)
+        return queryset.filter(booking__client=user)
+
+    def perform_create(self, serializer):
+        if self.request.user.role != 'client':
+            raise PermissionDenied('Only clients can create payments.')
+        booking = serializer.validated_data['booking']
+        if booking.client_id != self.request.user.id:
+            raise PermissionDenied('You can only pay for your own booking.')
+        serializer.save(amount=booking.service.price)
+
 class UserListView(generics.ListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsSpaAdmin]
 
 class TherapistListView(generics.ListAPIView):
     queryset = User.objects.filter(role="therapist")
