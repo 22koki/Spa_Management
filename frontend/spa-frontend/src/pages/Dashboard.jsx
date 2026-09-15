@@ -4,6 +4,7 @@ import Services from "./Services";
 import Bookings from "./Bookings";
 import Payments from "./Payments";
 import BookService from "./BookService";
+import Receipt from "./Receipt";
 
 const items = [["services","✦","Services"],["book","◫","Book a Service"],["bookings","▤","My Bookings"],["payments","▭","Payments"]];
 
@@ -16,7 +17,7 @@ export default function Dashboard() {
       <button className="logout" onClick={logout}>↪ Logout</button><p className="sidebar-quote">“A calmer you.<br/>A brighter tomorrow.”</p>
     </aside>
     <main className="main-area"><header className="topbar"><span>⌕ &nbsp; Find your moment of calm...</span><b>Welcome, Wyonna ◌</b></header>
-      <Routes><Route index element={<Home/>}/><Route path="services" element={<Services/>}/><Route path="bookings" element={<Bookings/>}/><Route path="payments" element={<Payments/>}/><Route path="book" element={<BookService/>}/><Route path="*" element={<Navigate to="/dashboard" replace/>}/></Routes>
+      <Routes><Route index element={<Home/>}/><Route path="services" element={<Services/>}/><Route path="bookings" element={<Bookings/>}/><Route path="payments" element={<Payments/>}/><Route path="receipts/:id" element={<Receipt/>}/><Route path="book" element={<BookService/>}/><Route path="*" element={<Navigate to="/dashboard" replace/>}/></Routes>
     </main>
   </div>;
 }

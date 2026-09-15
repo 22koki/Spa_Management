@@ -10,7 +10,8 @@ A full-stack spa booking MVP for clients, therapists, services, appointments, an
 - Prevent overlapping appointments for the same therapist
 - Scope booking visibility to each client's or therapist's own records
 - Give admins access to all bookings
-- Record payments against bookings
+- Accept M-PESA STK, Till, card, and cash payment submissions
+- Confirm offline payments and print or save branded receipts as PDF
 
 ## Stack
 
@@ -68,7 +69,10 @@ The app runs at `http://localhost:3000`.
 | GET | `/api/users/therapists/` | List active therapists | JWT |
 | GET | `/api/bookings/` | List role-scoped bookings | JWT |
 | POST | `/api/bookings/` | Create a booking | Client JWT |
-| POST | `/api/payments/` | Create a payment | Current MVP endpoint |
+| GET/POST | `/api/payments/` | List role-scoped payments or start payment | JWT |
+| POST | `/api/payments/{id}/confirm/` | Confirm a cash or Till payment | Admin JWT |
+| POST | `/api/payments/webhooks/mpesa/` | Receive a guarded Daraja result | Callback token |
+| POST | `/api/payments/webhooks/flutterwave/` | Receive and re-verify card result | Signature hash |
 
 Send authenticated requests with `Authorization: Bearer <access-token>`.
 
@@ -88,8 +92,17 @@ The suite covers authentication, ownership enforcement, role-based visibility, t
 
 ## MVP limitations / next steps
 
-- Add refresh-token handling and logout/token revocation
-- Restrict service, user, payment, and booking-status administration by role
+## Payment sandbox configuration
+
+Copy `backend/.env.example` to `backend/.env`, then add Daraja sandbox and Flutterwave test credentials. Django loads this file automatically. Never commit the real values.
+
+Generate a fresh Django secret for `DJANGO_SECRET_KEY` before deployment and set `DJANGO_DEBUG=False` with the deployed API hostname in `DJANGO_ALLOWED_HOSTS`.
+
+M-PESA and Flutterwave callbacks require a public HTTPS API URL. Cash and Till submissions remain pending until a staff member confirms them in Django Admin. Successful payments receive a unique receipt number; clients can open the receipt from Payment History and use **Print / Save as PDF**.
+
+Use only sandbox/test credentials until the complete callback flow has passed testing. The server derives payment amounts from bookings, limits clients to their own bookings, rejects reused Till transaction codes, verifies Flutterwave transactions with the provider, and generates receipts only after confirmed payment.
+
+- Add server-side refresh-token revocation on logout
 - Move secrets and database credentials to environment variables before deployment
 - Add therapist working hours, time-zone-aware availability, cancellation, and rescheduling
 - Add CORS configuration when frontend and API use different origins
