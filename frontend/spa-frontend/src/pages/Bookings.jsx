@@ -18,15 +18,12 @@ export default function Bookings() {
   };
 
   return (
-    <div>
-      <h2>Bookings</h2>
-      <ul>
+    <div className="page"><div className="page-header"><div><span className="eyebrow">YOUR WELLNESS CALENDAR</span><h1>My Bookings</h1></div></div>
+      <ul className="data-list">
         {bookings.map((b) => (
-          <li key={b.id}>
-            Booking #{b.id}: Client {b.client} - Service {b.service} - {b.date} {b.time} - Status: {b.status}
-          </li>
+          <li className="data-card" key={b.id}><div><b>Appointment #{b.id}</b><p>Service {b.service} · {b.date} at {b.time}</p></div><span className="status">{b.status}</span></li>
         ))}
-      </ul>
+      </ul>{bookings.length === 0 && <div className="panel empty">No bookings yet. Your next moment of calm starts here.</div>}
     </div>
   );
 }

@@ -18,15 +18,13 @@ export default function Services() {
   };
 
   return (
-    <div>
-      <h2>Services</h2>
-      <ul>
+    <div className="page">
+      <div className="page-header"><div><span className="eyebrow">CURATED FOR YOU</span><h1>Our Services</h1></div></div>
+      <div className="service-grid">
         {services.map((service) => (
-          <li key={service.id}>
-            <b>{service.name}</b>: {service.description} - ${service.price} ({service.duration} mins)
-          </li>
+          <article className="panel" key={service.id}><span className="eyebrow">SIGNATURE TREATMENT</span><h2>{service.name}</h2><p>{service.description}</p><b>{service.duration} min &nbsp; · &nbsp; ${service.price}</b></article>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

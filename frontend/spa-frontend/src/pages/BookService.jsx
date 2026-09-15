@@ -58,28 +58,29 @@ export default function BookService() {
   };
 
   return (
-    <div>
-      <h2>Book a Service</h2>
-      {message && <p>{message}</p>}
-      <form onSubmit={handleBooking}>
-        <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required>
+    <div className="page">
+      <div className="page-header"><div><span className="eyebrow">YOUR MOMENT</span><h1>Book a Service</h1></div></div>
+      {message && <p className="message">{message}</p>}
+      <div className="booking-layout"><div className="booking-visual"><div><h2>Time to exhale.</h2><p>Choose the treatment that brings you back to yourself.</p></div></div>
+      <form className="panel booking-form" onSubmit={handleBooking}>
+        <div className="field"><label>Service</label><select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required>
           <option value="">Select Service</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
-        </select>
+        </select></div>
 
-        <select value={therapistId} onChange={(e) => setTherapistId(e.target.value)} required>
+        <div className="field"><label>Choose therapist</label><select value={therapistId} onChange={(e) => setTherapistId(e.target.value)} required>
           <option value="">Select Therapist</option>
           {therapists.map((t) => (
             <option key={t.id} value={t.id}>{t.username}</option>
           ))}
-        </select>
+        </select></div>
 
-        <input type="date" min={new Date().toISOString().split("T")[0]} value={date} onChange={(e) => setDate(e.target.value)} required />
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
-        <button type="submit" disabled={submitting}>{submitting ? "Booking..." : "Book"}</button>
-      </form>
+        <div className="field-row"><div className="field"><label>Select date</label><input type="date" min={new Date().toISOString().split("T")[0]} value={date} onChange={(e) => setDate(e.target.value)} required /></div>
+        <div className="field"><label>Select time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div>
+        <button className="submit-button" type="submit" disabled={submitting}>{submitting ? "Booking..." : "Confirm booking"}</button>
+      </form></div>
     </div>
   );
 }
