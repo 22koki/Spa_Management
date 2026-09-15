@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db.models import Q
 
 # Custom User Model
 class User(AbstractUser):
@@ -24,12 +25,27 @@ class Service(models.Model):
 
 # Bookings
 class Booking(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
+    )
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name="client_bookings")
     therapist = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="therapist_bookings")
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     date = models.DateField()
     time = models.TimeField()
-    status = models.CharField(max_length=20, default="pending")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['therapist', 'date', 'time'],
+                condition=~Q(status='cancelled'),
+                name='unique_active_therapist_start',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.client.username} - {self.service.name}"
