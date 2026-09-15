@@ -32,10 +32,19 @@ class ServiceSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     client = serializers.PrimaryKeyRelatedField(read_only=True)
     status = serializers.CharField(read_only=True)
+    client_name = serializers.CharField(source='client.username', read_only=True)
+    therapist_name = serializers.CharField(source='therapist.username', read_only=True)
+    service_name = serializers.CharField(source='service.name', read_only=True)
+    duration = serializers.IntegerField(source='service.duration', read_only=True)
+    price = serializers.DecimalField(source='service.price', max_digits=10, decimal_places=2, read_only=True)
+    is_paid = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = '__all__'
+
+    def get_is_paid(self, booking):
+        return hasattr(booking, 'payment')
 
     def validate_therapist(self, therapist):
         if therapist.role != 'therapist' or not therapist.is_active:
