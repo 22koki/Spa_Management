@@ -44,7 +44,10 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_is_paid(self, booking):
-        return hasattr(booking, 'payment')
+        try:
+            return booking.payment.status == 'paid'
+        except Payment.DoesNotExist:
+            return False
 
     def validate_therapist(self, therapist):
         if therapist.role != 'therapist' or not therapist.is_active:
@@ -85,7 +88,25 @@ class BookingSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    client_name = serializers.CharField(source='booking.client.username', read_only=True)
+    service_name = serializers.CharField(source='booking.service.name', read_only=True)
+    appointment_date = serializers.DateField(source='booking.date', read_only=True)
 
     class Meta:
         model = Payment
         fields = '__all__'
+
+    def validate(self, attrs):
+        method = attrs.get('method')
+        if method == 'mpesa_stk' and not attrs.get('phone_number'):
+            raise serializers.ValidationError({'phone_number': 'A phone number is required for STK Push.'})
+        if method == 'mpesa_till' and not attrs.get('customer_reference'):
+            raise serializers.ValidationError({'customer_reference': 'Enter the M-PESA transaction code.'})
+        if method == 'mpesa_till':
+            reference = attrs.get('customer_reference', '').strip().upper()
+            if Payment.objects.filter(method='mpesa_till', customer_reference__iexact=reference).exists():
+                raise serializers.ValidationError(
+                    {'customer_reference': 'This M-PESA transaction code has already been submitted.'}
+                )
+            attrs['customer_reference'] = reference
+        return attrs
