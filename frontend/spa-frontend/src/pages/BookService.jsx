@@ -9,6 +9,7 @@ export default function BookService() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchServices();
@@ -35,12 +36,24 @@ export default function BookService() {
 
   const handleBooking = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
+    setMessage("");
     try {
       await createBooking({ service: serviceId, therapist: therapistId, date, time });
       setMessage("Booking created successfully!");
+      setServiceId("");
+      setTherapistId("");
+      setDate("");
+      setTime("");
     } catch (err) {
-      setMessage("Error creating booking");
+      const errors = err.response?.data;
+      const detail = errors && typeof errors === "object"
+        ? Object.values(errors).flat().join(" ")
+        : null;
+      setMessage(detail || "Error creating booking");
       console.error(err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -63,9 +76,9 @@ export default function BookService() {
           ))}
         </select>
 
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        <input type="date" min={new Date().toISOString().split("T")[0]} value={date} onChange={(e) => setDate(e.target.value)} required />
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
-        <button type="submit">Book</button>
+        <button type="submit" disabled={submitting}>{submitting ? "Booking..." : "Book"}</button>
       </form>
     </div>
   );
