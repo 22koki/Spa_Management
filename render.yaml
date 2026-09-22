@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: serenity-spa-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: gunicorn spa_backend.wsgi:application
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: serenity-spa-api.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://serenity-spa-demo.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://serenity-spa-demo.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: serenity-spa-db
+          property: connectionString
+
+  - type: web
+    name: serenity-spa-demo
+    runtime: static
+    rootDir: frontend/spa-frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://serenity-spa-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: serenity-spa-db
