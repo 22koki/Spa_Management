@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Booking, Payment, Service, User
+from .models import Booking, Payment, Service, User, Location, Room
 
 
 class BookingSecurityTests(APITestCase):
@@ -140,3 +140,27 @@ class PaymentWorkflowTests(APITestCase):
         )
         self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('customer_reference', duplicate.data)
+
+class OperationsMVPTests(APITestCase):
+    def setUp(self):
+        self.owner=User.objects.create_user(username='owner',password='pass',role='owner')
+        self.client_user=User.objects.create_user(username='guest',password='pass',role='client')
+        self.therapist=User.objects.create_user(username='practitioner',password='pass',role='practitioner')
+        self.location=Location.objects.create(name='Westlands')
+        self.room=Room.objects.create(location=self.location,name='Massage Room')
+        self.service=Service.objects.create(name='Massage',description='Test',duration=60,price='1000',deposit_percent=30)
+        self.booking=Booking.objects.create(client=self.client_user,therapist=self.therapist,service=self.service,
+            room=self.room,location=self.location,date=timezone.localdate()+timedelta(days=1),time=time(10),status='booked')
+
+    def test_owner_can_read_dashboard_and_confirm_booking(self):
+        self.client.force_authenticate(self.owner)
+        self.assertEqual(self.client.get('/api/reports/dashboard/').status_code,200)
+        response=self.client.patch(f'/api/bookings/{self.booking.pk}/status/',{'status':'confirmed'},format='json')
+        self.assertEqual(response.status_code,200)
+        self.booking.refresh_from_db(); self.assertEqual(self.booking.status,'confirmed')
+
+    def test_deposit_amount_is_server_calculated(self):
+        self.client.force_authenticate(self.client_user)
+        response=self.client.post('/api/payments/',{'booking':self.booking.pk,'method':'cash','payment_type':'deposit'},format='json')
+        self.assertEqual(response.status_code,201)
+        self.assertEqual(str(Payment.objects.get().amount),'300.00')

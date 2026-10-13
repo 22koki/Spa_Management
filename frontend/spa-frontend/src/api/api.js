@@ -76,3 +76,11 @@ export const createPayment = (paymentData) =>
 
 // --- Therapists ---
 export const getTherapists = () => api.get("/users/therapists/");
+export const getDashboardReport = () => api.get("/reports/dashboard/");
+export const updateBookingStatus = (id, status, reason = "") =>
+  api.patch(`/bookings/${id}/status/`, { status, reason });
+export const getLocations = () => api.get("/locations/");
+export const getRooms = () => api.get("/rooms/");
+export const getAvailability = () => api.get("/availability/");
+export const getClients = () => api.get("/client-profiles/");
+export const getAuditEvents = () => api.get("/audit-events/");
