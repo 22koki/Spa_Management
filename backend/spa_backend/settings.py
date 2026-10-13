@@ -24,6 +24,13 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+<<<<<<< Updated upstream
+=======
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "dev-only-change-me-spa-management"
+)
+>>>>>>> Stashed changes
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
@@ -155,14 +162,25 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
+        (
+            "http://localhost:3000,"
+            "http://127.0.0.1:3000,"
+            "http://172.24.128.1:3000"
+        ),
     ).split(",")
     if origin.strip()
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        (
+            "http://localhost:3000,"
+            "http://127.0.0.1:3000,"
+            "http://172.24.128.1:3000"
+        ),
+    ).split(",")
     if origin.strip()
 ]
 
