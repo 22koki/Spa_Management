@@ -1,0 +1,18 @@
+import React, {useEffect, useState} from "react";
+import {getDashboardReport, getBookings, updateBookingStatus} from "../api/api";
+import "./Operations.css";
+const money=n=>new Intl.NumberFormat("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0}).format(Number(n||0));
+export default function Operations(){
+ const [report,setReport]=useState(null),[bookings,setBookings]=useState([]),[error,setError]=useState("");
+ const load=async()=>{try{const [r,b]=await Promise.all([getDashboardReport(),getBookings()]);setReport(r.data);setBookings(b.data);setError("")}catch(e){setError(e.response?.data?.detail||"Could not load operations data. Your role may not have owner access.")}};
+ useEffect(()=>{load()},[]);
+ const move=async(id,status)=>{await updateBookingStatus(id,status);load()};
+ const fallbacks=[{kind:"unconfirmed",count:"—",label:"appointments need confirmation"},{kind:"slots",count:"—",label:"high-value slots available"},{kind:"rebooking",count:"—",label:"clients due for rebooking"}];
+ return <div className="ops-page"><header className="ops-head"><div><span>TODAY · SPA OPERATIONS</span><h1>What needs attention</h1><p>Act on the work that protects revenue and guest trust.</p></div><button onClick={load}>Refresh</button></header>
+ {error&&<div className="ops-error">{error}</div>}<section className="metric-row"><Metric label="Daily sales" value={money(report?.sales)}/><Metric label="Appointments" value={report?.appointments??"—"}/><Metric label="Utilization" value={report?report.staff_utilization+"%":"—"}/><Metric label="No-shows" value={report?.no_shows??"—"}/></section>
+ <section className="attention-grid">{(report?.attention||fallbacks).map((a,i)=><article className={"attention-card tone-"+i} key={a.kind}><b>{a.count}</b><div><h3>{a.label}</h3><p>{i===0?"Confirm now to reduce drop-off":i===1?"Offer the opening to the waitlist":"Send a thoughtful reminder"}</p></div><span>→</span></article>)}</section>
+ <section className="ops-panel"><div className="panel-title"><div><span>LIVE WORKFLOW</span><h2>Appointments</h2></div><small>booked → confirmed → arrived → completed</small></div><div className="appointment-list">{bookings.length?bookings.slice(0,8).map(b=><article key={b.id}><div><b>{b.time?.slice(0,5)}</b><small>{b.date}</small></div><div className="appointment-main"><strong>{b.client_name}</strong><span>{b.service_name} · {b.therapist_name}</span></div><em className={"booking-status "+b.status}>{b.status}</em><div className="status-actions">{["confirmed","arrived","completed"].map(s=><button disabled={b.status===s} onClick={()=>move(b.id,s)} key={s}>{s}</button>)}</div></article>):<p className="empty">No appointments to show.</p>}</div></section>
+ <section className="mvp-grid"><Info title="Staff & resources" lines={["Availability, breaks and time off","Skills and certification matching","Room and equipment conflict protection"]}/><Info title="Client safety" lines={["Preferences and visit history","Allergies and contraindications","Consent forms and private notes"]}/><Info title="Revenue controls" lines={["Deposits or full payment","Discounts, taxes, tips and receipts","Audit trail and daily reporting"]}/></section></div>
+}
+function Metric({label,value}){return <article className="metric"><span>{label}</span><strong>{value}</strong></article>}
+function Info({title,lines}){return <article className="info-card"><h3>{title}</h3>{lines.map(x=><p key={x}>✓ {x}</p>)}</article>}
