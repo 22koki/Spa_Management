@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import User, Service, Booking, Payment
+from .models import (User, Service, Booking, Payment, Location, Room, Skill,
+    ServiceAddon, StaffProfile, Availability, TimeOff, ClientProfile,
+    IntakeForm, AuditEvent, Reminder, Subscription)
 from django.contrib.auth.hashers import make_password
 from datetime import datetime, timedelta
 from django.utils import timezone
@@ -24,6 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ServiceSerializer(serializers.ModelSerializer):
+    addons = serializers.StringRelatedField(many=True, read_only=True)
     class Meta:
         model = Service
         fields = '__all__'
@@ -82,6 +85,14 @@ class BookingSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {'time': 'This therapist is unavailable during that time.'}
                     )
+            room = attrs.get('room')
+            if room:
+                room_bookings = Booking.objects.filter(room=room, date=booking_date).exclude(status='cancelled').select_related('service')
+                for booking in room_bookings:
+                    existing_start = datetime.combine(booking.date, booking.time)
+                    existing_end = existing_start + timedelta(minutes=booking.service.duration + booking.service.cleanup_buffer)
+                    if requested_start < existing_end and existing_start < requested_end + timedelta(minutes=service.cleanup_buffer):
+                        raise serializers.ValidationError({'room':'This room is unavailable including cleanup time.'})
 
         return attrs
 
@@ -110,3 +121,29 @@ class PaymentSerializer(serializers.ModelSerializer):
                 )
             attrs['customer_reference'] = reference
         return attrs
+
+class LocationSerializer(serializers.ModelSerializer):
+    class Meta: model = Location; fields = '__all__'
+class RoomSerializer(serializers.ModelSerializer):
+    class Meta: model = Room; fields = '__all__'
+class SkillSerializer(serializers.ModelSerializer):
+    class Meta: model = Skill; fields = '__all__'
+class ServiceAddonSerializer(serializers.ModelSerializer):
+    class Meta: model = ServiceAddon; fields = '__all__'
+class StaffProfileSerializer(serializers.ModelSerializer):
+    class Meta: model = StaffProfile; fields = '__all__'
+class AvailabilitySerializer(serializers.ModelSerializer):
+    class Meta: model = Availability; fields = '__all__'
+class TimeOffSerializer(serializers.ModelSerializer):
+    class Meta: model = TimeOff; fields = '__all__'
+class ClientProfileSerializer(serializers.ModelSerializer):
+    class Meta: model = ClientProfile; fields = '__all__'
+class IntakeFormSerializer(serializers.ModelSerializer):
+    class Meta: model = IntakeForm; fields = '__all__'
+class AuditEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.CharField(source='actor.username', read_only=True)
+    class Meta: model = AuditEvent; fields = '__all__'
+class ReminderSerializer(serializers.ModelSerializer):
+    class Meta: model = Reminder; fields = '__all__'
+class SubscriptionSerializer(serializers.ModelSerializer):
+    class Meta: model = Subscription; fields = '__all__'
