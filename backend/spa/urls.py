@@ -1,10 +1,21 @@
-from django.urls import path
-from .views import ServiceListCreate, RegisterView, UserListView,MyTokenObtainPairView, BookingListCreate, PaymentCreate, ConfirmPaymentView, therapist_list, mpesa_callback, flutterwave_webhook
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import *
 from rest_framework_simplejwt.views import TokenRefreshView
 
+router=DefaultRouter()
+for prefix, view in [('locations',LocationViewSet),('rooms',RoomViewSet),('skills',SkillViewSet),
+ ('addons',AddonViewSet),('staff-profiles',StaffProfileViewSet),('availability',AvailabilityViewSet),
+ ('time-off',TimeOffViewSet),('client-profiles',ClientProfileViewSet),('intake-forms',IntakeFormViewSet),
+ ('reminders',ReminderViewSet),('subscriptions',SubscriptionViewSet),('audit-events',AuditEventViewSet)]:
+    router.register(prefix, view)
+
 urlpatterns = [
+    path('',include(router.urls)),
     path('services/', ServiceListCreate.as_view()),
     path('bookings/', BookingListCreate.as_view()),
+    path('bookings/<int:pk>/status/', booking_status),
+    path('reports/dashboard/', dashboard_report),
     path('payments/', PaymentCreate.as_view(), name='payments'),
     path('payments/<int:pk>/confirm/', ConfirmPaymentView.as_view(), name='payment-confirm'),
     path('payments/webhooks/mpesa/', mpesa_callback, name='mpesa-callback'),
