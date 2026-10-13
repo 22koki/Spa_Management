@@ -1,9 +1,12 @@
 from rest_framework import generics
-from .models import User, Service, Booking, Payment
-from .serializers import UserSerializer, ServiceSerializer, BookingSerializer, PaymentSerializer, RegisterSerializer
+from .models import (User, Service, Booking, Payment, Location, Room, Skill,
+    ServiceAddon, StaffProfile, Availability, TimeOff, ClientProfile,
+    IntakeForm, AuditEvent, Reminder, Subscription)
+from .serializers import *
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
@@ -14,16 +17,26 @@ from rest_framework.views import APIView
 from .payment_gateways import initiate_mpesa_stk, initiate_flutterwave, verify_flutterwave, GatewayConfigurationError, GatewayError
 import hmac
 import os
+from datetime import timedelta
+from django.db.models import Count, Sum, F, DecimalField
+from django.utils import timezone
 
 class IsAdminOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and (
-            request.method in ('GET', 'HEAD', 'OPTIONS') or request.user.is_staff or request.user.role == 'admin'
+            request.method in ('GET', 'HEAD', 'OPTIONS') or request.user.is_staff or request.user.role in ('admin','owner','manager')
         ))
 
 class IsSpaAdmin(BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and (request.user.is_staff or request.user.role == 'admin'))
+        return bool(request.user and request.user.is_authenticated and
+                    (request.user.is_staff or request.user.role in ('admin','owner','manager','receptionist')))
+
+class IsManagerOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and (
+            request.method in ('GET','HEAD','OPTIONS') or request.user.is_staff or
+            request.user.role in ('admin','owner','manager')))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -63,7 +76,7 @@ class BookingListCreate(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = Booking.objects.select_related('client', 'therapist', 'service', 'payment')
-        if user.role == 'admin':
+        if user.is_staff or user.role in ('admin','owner','manager','receptionist'):
             return queryset
         if user.role == 'therapist':
             return queryset.filter(therapist=user)
@@ -110,7 +123,10 @@ class PaymentCreate(generics.ListCreateAPIView):
                 {'booking': ['A payment has already been started for this booking.']},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        payment = serializer.save(amount=booking.service.price, status='pending')
+        payment_type = serializer.validated_data.get('payment_type', 'full')
+        subtotal = booking.service.price
+        amount = subtotal if payment_type == 'full' else (subtotal * booking.service.deposit_percent / 100)
+        payment = serializer.save(amount=amount, subtotal=subtotal, status='pending')
         try:
             if payment.method == 'mpesa_stk':
                 result = initiate_mpesa_stk(payment)
@@ -187,5 +203,68 @@ class UserListView(generics.ListAPIView):
     permission_classes = [IsSpaAdmin]
 
 class TherapistListView(generics.ListAPIView):
-    queryset = User.objects.filter(role="therapist")
+    queryset = User.objects.filter(role__in=["therapist","practitioner"])
     serializer_class = UserSerializer
+
+class ManagedModelViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsManagerOrReadOnly]
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        AuditEvent.objects.create(actor=self.request.user, action='created',
+            object_type=obj.__class__.__name__, object_id=str(obj.pk))
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        AuditEvent.objects.create(actor=self.request.user, action='updated',
+            object_type=obj.__class__.__name__, object_id=str(obj.pk))
+
+class LocationViewSet(ManagedModelViewSet): queryset=Location.objects.all(); serializer_class=LocationSerializer
+class RoomViewSet(ManagedModelViewSet): queryset=Room.objects.all(); serializer_class=RoomSerializer
+class SkillViewSet(ManagedModelViewSet): queryset=Skill.objects.all(); serializer_class=SkillSerializer
+class AddonViewSet(ManagedModelViewSet): queryset=ServiceAddon.objects.all(); serializer_class=ServiceAddonSerializer
+class StaffProfileViewSet(ManagedModelViewSet): queryset=StaffProfile.objects.all(); serializer_class=StaffProfileSerializer
+class AvailabilityViewSet(ManagedModelViewSet): queryset=Availability.objects.all(); serializer_class=AvailabilitySerializer
+class TimeOffViewSet(ManagedModelViewSet): queryset=TimeOff.objects.all(); serializer_class=TimeOffSerializer
+class ClientProfileViewSet(ManagedModelViewSet): queryset=ClientProfile.objects.all(); serializer_class=ClientProfileSerializer
+class IntakeFormViewSet(ManagedModelViewSet): queryset=IntakeForm.objects.all(); serializer_class=IntakeFormSerializer
+class ReminderViewSet(ManagedModelViewSet): queryset=Reminder.objects.all(); serializer_class=ReminderSerializer
+class SubscriptionViewSet(ManagedModelViewSet): queryset=Subscription.objects.all(); serializer_class=SubscriptionSerializer
+
+class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset=AuditEvent.objects.select_related('actor').all().order_by('-created_at')
+    serializer_class=AuditEventSerializer; permission_classes=[IsSpaAdmin]
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def booking_status(request, pk):
+    booking=get_object_or_404(Booking, pk=pk)
+    allowed={'booked','confirmed','arrived','completed','cancelled','no_show'}
+    new_status=request.data.get('status')
+    if new_status not in allowed: return Response({'status':['Invalid appointment status.']}, status=400)
+    user=request.user
+    if not (user.is_staff or user.role in ('admin','owner','manager','receptionist') or
+            (user.role in ('therapist','practitioner') and booking.therapist_id==user.id) or
+            (user.role=='client' and booking.client_id==user.id and new_status=='cancelled')):
+        raise PermissionDenied('You cannot change this appointment.')
+    booking.status=new_status
+    if new_status=='cancelled': booking.cancellation_reason=request.data.get('reason','')
+    booking.save(update_fields=['status','cancellation_reason'])
+    AuditEvent.objects.create(actor=user, action=f'booking_{new_status}', object_type='Booking', object_id=str(booking.pk))
+    return Response(BookingSerializer(booking).data)
+
+@api_view(['GET'])
+@permission_classes([IsSpaAdmin])
+def dashboard_report(request):
+    today=timezone.localdate()
+    bookings=Booking.objects.filter(date=today)
+    sales=Payment.objects.filter(status='paid', date_paid__date=today).aggregate(total=Sum('amount'))['total'] or 0
+    completed=bookings.filter(status='completed').count()
+    no_shows=bookings.filter(status='no_show').count()
+    practitioners=User.objects.filter(role__in=('therapist','practitioner'), is_active=True).count()
+    attention=[
+        {'kind':'unconfirmed','count':bookings.filter(status__in=('pending','booked')).count(),'label':'appointments need confirmation'},
+        {'kind':'no_show','count':no_shows,'label':'no-shows today'},
+        {'kind':'rebooking','count':Booking.objects.filter(status='completed',date__lte=today-timedelta(days=28)).values('client').distinct().count(),'label':'clients due for rebooking'},
+    ]
+    return Response({'date':today,'sales':sales,'appointments':bookings.count(),'completed':completed,
+        'no_shows':no_shows,'staff_utilization':round((bookings.exclude(status='cancelled').count()/(practitioners*8))*100,1) if practitioners else 0,
+        'attention':attention})
