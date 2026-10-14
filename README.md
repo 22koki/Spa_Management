@@ -12,6 +12,7 @@ A full-stack spa booking MVP for clients, therapists, services, appointments, an
 - Give admins access to all bookings
 - Accept M-PESA STK, Till, card, and cash payment submissions
 - Confirm offline payments and print or save branded receipts as PDF
+- Schedule WhatsApp reminders and open pre-filled reminder chats from the owner workspace
 
 ## Stack
 
@@ -58,6 +59,8 @@ npm start
 ```
 
 The app runs at `http://localhost:3000`.
+
+Copy `frontend/spa-frontend/.env.example` to `frontend/spa-frontend/.env` and set `REACT_APP_SPA_WHATSAPP_NUMBER` to the spa's WhatsApp number in international format (for example `254712345678`). This enables the floating customer-support chat button.
 
 ## Core API
 
