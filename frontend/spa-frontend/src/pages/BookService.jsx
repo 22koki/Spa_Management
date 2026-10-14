@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getServices, getTherapists, createBooking } from "../api/api";
 import { useSearchParams } from "react-router-dom";
+import "./BookService.css";
 
 export default function BookService() {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,8 @@ export default function BookService() {
   const [time, setTime] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [whatsappReminder, setWhatsappReminder] = useState(true);
+  const [whatsappPhone, setWhatsappPhone] = useState("");
 
   useEffect(() => {
     fetchServices();
@@ -41,8 +44,17 @@ export default function BookService() {
     setSubmitting(true);
     setMessage("");
     try {
-      await createBooking({ service: serviceId, therapist: therapistId, date, time });
-      setMessage("Booking created successfully!");
+      await createBooking({
+        service: serviceId,
+        therapist: therapistId,
+        date,
+        time,
+        whatsapp_reminder: whatsappReminder,
+        whatsapp_phone: whatsappPhone,
+      });
+      setMessage(whatsappReminder
+        ? "Booking created! Your WhatsApp reminder has been scheduled."
+        : "Booking created successfully!");
       setServiceId("");
       setTherapistId("");
       setDate("");
@@ -81,6 +93,8 @@ export default function BookService() {
 
         <div className="field-row"><div className="field"><label>Select date</label><input type="date" min={new Date().toISOString().split("T")[0]} value={date} onChange={(e) => setDate(e.target.value)} required /></div>
         <div className="field"><label>Select time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div>
+        <label className="reminder-choice"><input type="checkbox" checked={whatsappReminder} onChange={e=>setWhatsappReminder(e.target.checked)}/><span><b>Remind me on WhatsApp</b><small>We will prepare a reminder 24 hours before your appointment.</small></span></label>
+        {whatsappReminder&&<div className="field"><label>WhatsApp number</label><input type="tel" placeholder="e.g. +254 712 345 678" value={whatsappPhone} onChange={e=>setWhatsappPhone(e.target.value)} required /></div>}
         <button className="submit-button" type="submit" disabled={submitting}>{submitting ? "Booking..." : "Confirm booking"}</button>
       </form></div>
     </div>
