@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Booking, Payment, Service, User, Location, Room
+from .models import Booking, Payment, Reminder, Service, User, Location, Room
 
 
 class BookingSecurityTests(APITestCase):
@@ -61,6 +61,19 @@ class BookingSecurityTests(APITestCase):
         response = self.client.post(self.url, self.payload(), format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_booking_can_schedule_a_whatsapp_reminder(self):
+        self.client.force_authenticate(self.client_user)
+        response = self.client.post(
+            self.url,
+            self.payload(whatsapp_reminder=True, whatsapp_phone='0712 345 678'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.client_user.refresh_from_db()
+        self.assertEqual(self.client_user.phone, '0712 345 678')
+        reminder = Reminder.objects.get(booking_id=response.data['id'], channel='whatsapp')
+        self.assertEqual(reminder.status, 'scheduled')
+
 # Create your tests here.
 
 
@@ -71,6 +84,7 @@ class PaymentWorkflowTests(APITestCase):
         self.admin_user = User.objects.create_user(
             username='spa-admin', password='pass', role='admin', is_staff=True
         )
+        self.owner_user = User.objects.create_user(username='spa-owner', password='pass', role='owner')
         self.therapist = User.objects.create_user(username='pay-therapist', password='pass', role='therapist')
         self.service = Service.objects.create(
             name='Facial', description='Restorative facial', duration=45, price='3500.00'
@@ -122,6 +136,32 @@ class PaymentWorkflowTests(APITestCase):
         self.assertEqual(payment.status, 'paid')
         self.assertEqual(payment.receipt_number, f'SER-{payment.pk:06d}')
         self.assertIsNotNone(payment.date_paid)
+
+    def test_owner_can_list_and_confirm_pending_manual_payments(self):
+        payment = Payment.objects.create(booking=self.booking, amount=self.service.price, method='cash')
+        Payment.objects.create(booking=self.other_booking, amount=self.service.price, method='mpesa_till', customer_reference='TKA12ABC34')
+        self.client.force_authenticate(self.owner_user)
+
+        listing = self.client.get('/api/payments/')
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(listing.data), 2)
+        self.assertTrue(all(item['can_confirm'] for item in listing.data))
+
+        confirmed = self.client.post(f'/api/payments/{payment.pk}/confirm/', {}, format='json')
+        self.assertEqual(confirmed.status_code, status.HTTP_200_OK)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'paid')
+
+    def test_client_cannot_self_confirm_a_pending_payment(self):
+        payment = Payment.objects.create(booking=self.booking, amount=self.service.price, method='cash')
+        self.client.force_authenticate(self.client_user)
+
+        listing = self.client.get('/api/payments/')
+        self.assertFalse(listing.data[0]['can_confirm'])
+        response = self.client.post(f'/api/payments/{payment.pk}/confirm/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'pending')
 
     def test_till_reference_is_required_and_cannot_be_reused(self):
         self.client.force_authenticate(self.client_user)
