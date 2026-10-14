@@ -6,6 +6,7 @@ import Payments from "./Payments";
 import BookService from "./BookService";
 import Receipt from "./Receipt";
 import Operations from "./Operations";
+import WhatsAppContact from "../components/WhatsAppContact";
 
 const items = [["operations","!","Today"],["services","✦","Services"],["book","◫","Book a Service"],["bookings","▤","Appointments"],["payments","▭","Checkout"]];
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
     </aside>
     <main className="main-area"><header className="topbar"><span>⌕ &nbsp; Find your moment of calm...</span><b>Welcome, Wyonna ◌</b></header>
       <Routes><Route index element={<Home/>}/><Route path="operations" element={<Operations/>}/><Route path="services" element={<Services/>}/><Route path="bookings" element={<Bookings/>}/><Route path="payments" element={<Payments/>}/><Route path="receipts/:id" element={<Receipt/>}/><Route path="book" element={<BookService/>}/><Route path="*" element={<Navigate to="/dashboard" replace/>}/></Routes>
+      <WhatsAppContact />
     </main>
   </div>;
 }
