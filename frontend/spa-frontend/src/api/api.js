@@ -73,6 +73,8 @@ export const createBooking = (bookingData) =>
 export const getPayments = () => api.get("/payments/");
 export const createPayment = (paymentData) =>
   api.post("/payments/", paymentData);
+export const confirmPayment = (id, providerReference = "") =>
+  api.post(`/payments/${id}/confirm/`, { provider_reference: providerReference });
 
 // --- Therapists ---
 export const getTherapists = () => api.get("/users/therapists/");
