@@ -174,7 +174,7 @@ class AuditEvent(models.Model):
 
 class Reminder(models.Model):
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='reminders')
-    channel = models.CharField(max_length=10, choices=[('email','Email'),('sms','SMS')])
+    channel = models.CharField(max_length=10, choices=[('email','Email'),('sms','SMS'),('whatsapp','WhatsApp')])
     kind = models.CharField(max_length=20, choices=[('confirmation','Confirmation'),('reminder','Reminder'),('rebooking','Rebooking')])
     scheduled_for = models.DateTimeField()
     sent_at = models.DateTimeField(null=True, blank=True)
