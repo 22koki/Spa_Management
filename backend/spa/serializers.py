@@ -5,6 +5,7 @@ from .models import (User, Service, Booking, Payment, Location, Room, Skill,
 from django.contrib.auth.hashers import make_password
 from datetime import datetime, timedelta
 from django.utils import timezone
+import re
 
 # Registration Serializer
 class RegisterSerializer(serializers.ModelSerializer):
@@ -41,6 +42,10 @@ class BookingSerializer(serializers.ModelSerializer):
     duration = serializers.IntegerField(source='service.duration', read_only=True)
     price = serializers.DecimalField(source='service.price', max_digits=10, decimal_places=2, read_only=True)
     is_paid = serializers.SerializerMethodField()
+    client_phone = serializers.CharField(source='client.phone', read_only=True)
+    whatsapp_reminder = serializers.BooleanField(write_only=True, required=False, default=False)
+    whatsapp_phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    whatsapp_reminder_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -52,12 +57,25 @@ class BookingSerializer(serializers.ModelSerializer):
         except Payment.DoesNotExist:
             return False
 
+    def get_whatsapp_reminder_status(self, booking):
+        reminder = booking.reminders.filter(channel='whatsapp').order_by('-scheduled_for').first()
+        return reminder.status if reminder else None
+
     def validate_therapist(self, therapist):
         if therapist.role != 'therapist' or not therapist.is_active:
             raise serializers.ValidationError('Select an active therapist.')
         return therapist
 
     def validate(self, attrs):
+        wants_whatsapp = attrs.get('whatsapp_reminder', False)
+        whatsapp_phone = attrs.get('whatsapp_phone', '').strip()
+        request = self.context.get('request')
+        saved_phone = getattr(getattr(request, 'user', None), 'phone', '')
+        if wants_whatsapp and not (whatsapp_phone or saved_phone):
+            raise serializers.ValidationError({'whatsapp_phone': 'Enter a WhatsApp number for the reminder.'})
+        if whatsapp_phone and len(re.sub(r'\D', '', whatsapp_phone)) < 9:
+            raise serializers.ValidationError({'whatsapp_phone': 'Enter a valid WhatsApp number including the country code.'})
+
         booking_date = attrs.get('date')
         booking_time = attrs.get('time')
         service = attrs.get('service')
@@ -96,16 +114,51 @@ class BookingSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def create(self, validated_data):
+        wants_whatsapp = validated_data.pop('whatsapp_reminder', False)
+        whatsapp_phone = validated_data.pop('whatsapp_phone', '').strip()
+        booking = super().create(validated_data)
+
+        if whatsapp_phone and booking.client.phone != whatsapp_phone:
+            booking.client.phone = whatsapp_phone
+            booking.client.save(update_fields=['phone'])
+
+        if wants_whatsapp:
+            appointment = timezone.make_aware(
+                datetime.combine(booking.date, booking.time),
+                timezone.get_current_timezone(),
+            )
+            scheduled_for = max(timezone.now(), appointment - timedelta(days=1))
+            Reminder.objects.create(
+                booking=booking,
+                channel='whatsapp',
+                kind='reminder',
+                scheduled_for=scheduled_for,
+                status='scheduled',
+            )
+        return booking
+
 
 class PaymentSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     client_name = serializers.CharField(source='booking.client.username', read_only=True)
     service_name = serializers.CharField(source='booking.service.name', read_only=True)
     appointment_date = serializers.DateField(source='booking.date', read_only=True)
+    can_confirm = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
         fields = '__all__'
+
+    def get_can_confirm(self, payment):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        return bool(
+            user and user.is_authenticated
+            and (user.is_staff or user.role in ('admin', 'owner', 'manager', 'receptionist'))
+            and payment.status == 'pending'
+            and payment.method in ('cash', 'mpesa_till', 'mpesa')
+        )
 
     def validate(self, attrs):
         method = attrs.get('method')

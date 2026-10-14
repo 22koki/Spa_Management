@@ -104,7 +104,7 @@ class PaymentCreate(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = Payment.objects.select_related('booking__client', 'booking__therapist', 'booking__service')
-        if user.is_staff or user.role == 'admin':
+        if user.is_staff or user.role in ('admin', 'owner', 'manager', 'receptionist'):
             return queryset
         if user.role == 'therapist':
             return queryset.filter(booking__therapist=user)
@@ -157,8 +157,17 @@ class PaymentCreate(generics.ListCreateAPIView):
 class ConfirmPaymentView(APIView):
     permission_classes = [IsSpaAdmin]
     def post(self, request, pk):
-        payment = get_object_or_404(Payment, pk=pk, method__in=['cash', 'mpesa_till'])
+        # Gateway payments are confirmed only by their signed webhooks. Staff
+        # may manually verify cash, Till, and records created by the legacy
+        # M-PESA flow that existed before STK callbacks were introduced.
+        payment = get_object_or_404(Payment, pk=pk, method__in=['cash', 'mpesa_till', 'mpesa'])
         payment.mark_paid(request.data.get('provider_reference', ''))
+        AuditEvent.objects.create(
+            actor=request.user,
+            action='confirmed payment',
+            object_type='Payment',
+            object_id=str(payment.pk),
+        )
         return Response(PaymentSerializer(payment).data)
 
 
