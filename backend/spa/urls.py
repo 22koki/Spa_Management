@@ -20,6 +20,7 @@ urlpatterns = [
     path('reports/dashboard/', dashboard_report),
     path('payments/', PaymentCreate.as_view(), name='payments'),
     path('payments/<int:pk>/confirm/', ConfirmPaymentView.as_view(), name='payment-confirm'),
+    path('payments/webhooks/mobile-money/', mpesa_callback, name='mobile-money-callback'),
     path('payments/webhooks/mpesa/', mpesa_callback, name='mpesa-callback'),
     path('payments/webhooks/flutterwave/', flutterwave_webhook, name='flutterwave-webhook'),
 # urls.py
