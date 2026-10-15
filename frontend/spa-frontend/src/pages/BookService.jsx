@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { getServices, getTherapists, createBooking } from "../api/api";
 import { useSearchParams } from "react-router-dom";
+import { useBusiness } from "../context/BusinessContext";
 import "./BookService.css";
 
 export default function BookService() {
+  const { business } = useBusiness();
   const [searchParams] = useSearchParams();
   const [services, setServices] = useState([]);
   const [therapists, setTherapists] = useState([]);
@@ -87,7 +89,7 @@ export default function BookService() {
         <div className="field"><label>Choose therapist</label><select value={therapistId} onChange={(e) => setTherapistId(e.target.value)} required>
           <option value="">Select Therapist</option>
           {therapists.map((t) => (
-            <option key={t.id} value={t.id}>{t.username}</option>
+            <option key={t.id} value={t.id}>{t.display_name || t.username}</option>
           ))}
         </select></div>
 
@@ -95,6 +97,7 @@ export default function BookService() {
         <div className="field"><label>Select time</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} required /></div></div>
         <label className="reminder-choice"><input type="checkbox" checked={whatsappReminder} onChange={e=>setWhatsappReminder(e.target.checked)}/><span><b>Remind me on WhatsApp</b><small>We will prepare a reminder 24 hours before your appointment.</small></span></label>
         {whatsappReminder&&<div className="field"><label>WhatsApp number</label><input type="tel" placeholder="e.g. +254 712 345 678" value={whatsappPhone} onChange={e=>setWhatsappPhone(e.target.value)} required /></div>}
+        <small className="verification-note">{business.cancellation_policy}</small>
         <button className="submit-button" type="submit" disabled={submitting}>{submitting ? "Booking..." : "Confirm booking"}</button>
       </form></div>
     </div>

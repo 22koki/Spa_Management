@@ -1,29 +1,74 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, NavLink, Navigate, Link } from "react-router-dom";
+import { getCurrentUser, getServices } from "../api/api";
+import { formatMoney, useBusiness } from "../context/BusinessContext";
 import Services from "./Services";
 import Bookings from "./Bookings";
 import Payments from "./Payments";
 import BookService from "./BookService";
 import Receipt from "./Receipt";
 import Operations from "./Operations";
+import BusinessSettings from "./BusinessSettings";
+import Team from "./Team";
+import Clients from "./Clients";
 import WhatsAppContact from "../components/WhatsAppContact";
 
-const items = [["operations","!","Today"],["services","✦","Services"],["book","◫","Book a Service"],["bookings","▤","Appointments"],["payments","▭","Checkout"]];
+const links = {
+  owner: [["operations", "!", "Today"], ["services", "✦", "Services"], ["bookings", "▤", "Appointments"], ["team", "♙", "Team & Rooms"], ["clients", "◎", "Clients"], ["payments", "▭", "Payments"], ["settings", "⚙", "Settings"]],
+  manager: [["operations", "!", "Today"], ["services", "✦", "Services"], ["bookings", "▤", "Appointments"], ["team", "♙", "Team & Rooms"], ["clients", "◎", "Clients"], ["payments", "▭", "Payments"], ["settings", "⚙", "Settings"]],
+  admin: [["operations", "!", "Today"], ["services", "✦", "Services"], ["bookings", "▤", "Appointments"], ["team", "♙", "Team & Rooms"], ["clients", "◎", "Clients"], ["payments", "▭", "Payments"], ["settings", "⚙", "Settings"]],
+  receptionist: [["operations", "!", "Today"], ["bookings", "▤", "Appointments"], ["clients", "◎", "Clients"], ["payments", "▭", "Payments"]],
+  therapist: [["bookings", "▤", "My schedule"], ["services", "✦", "Services"]],
+  practitioner: [["bookings", "▤", "My schedule"], ["services", "✦", "Services"]],
+  client: [["services", "✦", "Services"], ["book", "◫", "Book a Service"], ["bookings", "▤", "My Appointments"], ["payments", "▭", "Payments"]],
+};
 
 export default function Dashboard() {
-  const logout=()=>{localStorage.clear();window.location.href="/login"};
+  const { business } = useBusiness();
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState("");
+  useEffect(() => { getCurrentUser().then(response => setUser(response.data)).catch(() => setError("Your account could not be loaded.")); }, []);
+  const logout = () => { localStorage.clear(); window.location.href = "/login"; };
+  if (!user) return <div className="dashboard-loading">{error || "Preparing your workspace…"}</div>;
+  const navItems = links[user.role] || links.client;
+  const displayName = user.first_name || user.username;
+  const canOperate = ["owner", "manager", "admin", "receptionist"].includes(user.role) || user.is_staff;
+  const canManage = ["owner", "manager", "admin"].includes(user.role) || user.is_staff;
+
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span>♢</span><strong>Serenity Spa</strong><small>RESTORE · REBALANCE · BELONG</small></div>
-      <nav className="side-nav"><NavLink to="/dashboard" end>⌂ Dashboard</NavLink>{items.map(([p,i,l])=><NavLink key={p} to={`/dashboard/${p}`}>{i} {l}</NavLink>)}</nav>
-      <button className="logout" onClick={logout}>↪ Logout</button><p className="sidebar-quote">“A calmer you.<br/>A brighter tomorrow.”</p>
+      <div className="brand">{business.logo_url ? <img src={business.logo_url} alt=""/> : <span>♢</span>}<strong>{business.name}</strong><small>{business.tagline}</small></div>
+      <div className="role-chip">{user.role.replaceAll("_", " ")}</div>
+      <nav className="side-nav"><NavLink to="/dashboard" end>⌂ Overview</NavLink>{navItems.map(([path, icon, label]) => <NavLink key={path} to={`/dashboard/${path}`}>{icon} {label}</NavLink>)}</nav>
+      <button className="logout" onClick={logout}>↪ Logout</button><p className="sidebar-quote">“A calmer guest.<br/>A clearer day.”</p>
     </aside>
-    <main className="main-area"><header className="topbar"><span>⌕ &nbsp; Find your moment of calm...</span><b>Welcome, Wyonna ◌</b></header>
-      <Routes><Route index element={<Home/>}/><Route path="operations" element={<Operations/>}/><Route path="services" element={<Services/>}/><Route path="bookings" element={<Bookings/>}/><Route path="payments" element={<Payments/>}/><Route path="receipts/:id" element={<Receipt/>}/><Route path="book" element={<BookService/>}/><Route path="*" element={<Navigate to="/dashboard" replace/>}/></Routes>
+    <main className="main-area"><header className="topbar"><span>{canOperate ? "Today's priorities, appointments and revenue" : "Your wellness, beautifully organized"}</span><b>{displayName} · {user.role} ◌</b></header>
+      <Routes>
+        <Route index element={<Home user={user} business={business}/>}/>
+        <Route path="operations" element={canOperate ? <Operations/> : <Navigate to="/dashboard" replace/>}/>
+        <Route path="services" element={<Services user={user}/>}/>
+        <Route path="bookings" element={<Bookings user={user}/>}/>
+        <Route path="team" element={canManage ? <Team/> : <Navigate to="/dashboard" replace/>}/>
+        <Route path="clients" element={canOperate ? <Clients/> : <Navigate to="/dashboard" replace/>}/>
+        <Route path="payments" element={!["therapist", "practitioner"].includes(user.role) ? <Payments user={user}/> : <Navigate to="/dashboard/bookings" replace/>}/>
+        <Route path="receipts/:id" element={<Receipt/>}/>
+        <Route path="book" element={user.role === "client" ? <BookService/> : <Navigate to="/dashboard" replace/>}/>
+        <Route path="settings" element={canManage ? <BusinessSettings/> : <Navigate to="/dashboard" replace/>}/>
+        <Route path="*" element={<Navigate to="/dashboard" replace/>}/>
+      </Routes>
       <WhatsAppContact />
     </main>
   </div>;
 }
 
-function Home(){return <><section className="hero"><div><small>WELLNESS LIVES HERE</small><h1>Welcome back, Wyonna</h1><p>Take time for what matters most—you.<br/>Relax. Reconnect. Be well.</p><Link className="gold-button" to="/dashboard/book">Book your escape →</Link></div></section><section className="content-section"><div className="section-heading"><div><span>OUR COLLECTION</span><h2>Signature treatments</h2></div><Link to="/dashboard/services">Explore all →</Link></div><div className="feature-grid"><Card cls="massage" name="Swedish Massage" text="Relaxing, restorative, and made for total renewal." price="$50"/><Card cls="tissue" name="Deep Tissue" text="Release tension and restore natural movement." price="$75"/><Card cls="aroma" name="Aromatherapy" text="Botanical calm for a happier, healthier you." price="$65"/></div><div className="wellness-note"><span>✦</span><div><small>YOUR TIME TO RESTORE</small><h3>Self-care isn't a luxury. It's a better you.</h3></div><Link to="/dashboard/book">Reserve your moment</Link></div></section></>}
-function Card({cls,name,text,price}){return <article className={`feature-card ${cls}`}><div><h3>{name}</h3><p>{text}</p><b>60 min · {price}</b></div></article>}
+function Home({ user, business }) {
+  const [services, setServices] = useState([]);
+  useEffect(() => { getServices().then(response => setServices(response.data.slice(0, 3))).catch(() => {}); }, []);
+  const name = user.first_name || user.username;
+  const isClient = user.role === "client";
+  const destination = isClient ? "/dashboard/book" : ["therapist", "practitioner"].includes(user.role) ? "/dashboard/bookings" : "/dashboard/operations";
+  const heroStyle = business.hero_image_url ? { backgroundImage: `linear-gradient(90deg,rgba(5,29,23,.95),rgba(6,27,22,.5) 48%,transparent 75%),url('${business.hero_image_url}')` } : undefined;
+  return <><section className="hero" style={heroStyle}><div><small>{isClient ? "WELLNESS LIVES HERE" : "YOUR SPA, IN FOCUS"}</small><h1>Welcome back, {name}</h1><p>{isClient ? "Take time for what matters most—you.\nRelax. Reconnect. Be well." : "See what needs attention, keep the team aligned, and protect every guest experience."}</p><Link className="gold-button" to={destination}>{isClient ? "Book your escape" : "Open today's workspace"} →</Link></div></section><section className="content-section"><div className="section-heading"><div><span>OUR COLLECTION</span><h2>Signature treatments</h2></div><Link to="/dashboard/services">Explore all →</Link></div><div className="feature-grid">{services.length ? services.map((service, index) => <Card key={service.id} cls={["massage", "tissue", "aroma"][index % 3]} name={service.name} text={service.description} price={formatMoney(service.price, business.currency)} duration={service.duration}/>) : <div className="panel empty">Add services to bring this collection to life.</div>}</div><div className="wellness-note"><span>✦</span><div><small>{business.name.toUpperCase()}</small><h3>{business.tagline}</h3></div><Link to={destination}>{isClient ? "Reserve your moment" : "View priorities"}</Link></div></section></>;
+}
+
+function Card({ cls, name, text, price, duration }) { return <article className={`feature-card ${cls}`}><div><h3>{name}</h3><p>{text}</p><b>{duration} min · {price}</b></div></article>; }

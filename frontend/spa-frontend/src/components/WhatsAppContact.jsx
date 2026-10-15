@@ -1,7 +1,6 @@
 import React from "react";
+import { useBusiness } from "../context/BusinessContext";
 import "./WhatsAppContact.css";
-
-const configuredNumber = process.env.REACT_APP_SPA_WHATSAPP_NUMBER || "";
 
 function normalizePhone(value) {
   const digits = value.replace(/\D/g, "");
@@ -11,8 +10,9 @@ function normalizePhone(value) {
 }
 
 export default function WhatsAppContact() {
-  const phone = normalizePhone(configuredNumber);
+  const { business } = useBusiness();
+  const phone = normalizePhone(business.whatsapp_number || "");
   if (!phone) return null;
-  const message = "Hello Serenity Spa, I need some help with my booking.";
-  return <a className="whatsapp-contact" href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" aria-label="Chat with Serenity Spa on WhatsApp"><span>◉</span><b>Chat with the spa</b></a>;
+  const message = `Hello ${business.name}, I need some help with my booking.`;
+  return <a className="whatsapp-contact" href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" aria-label={`Chat with ${business.name} on WhatsApp`}><span>◉</span><b>Chat with the spa</b></a>;
 }

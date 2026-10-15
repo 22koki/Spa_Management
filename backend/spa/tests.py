@@ -4,7 +4,17 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Booking, Payment, Reminder, Service, User, Location, Room
+from .models import (
+    Availability,
+    Booking,
+    BusinessSettings,
+    Location,
+    Payment,
+    Reminder,
+    Room,
+    Service,
+    User,
+)
 
 
 class BookingSecurityTests(APITestCase):
@@ -181,6 +191,21 @@ class PaymentWorkflowTests(APITestCase):
         self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('customer_reference', duplicate.data)
 
+    def test_total_includes_configured_tax_and_customer_tip(self):
+        BusinessSettings.objects.create(tax_percent='16.00')
+        self.client.force_authenticate(self.client_user)
+        response = self.client.post(
+            '/api/payments/',
+            {'booking': self.booking.pk, 'method': 'cash', 'tip': '100.00'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payment = Payment.objects.get()
+        self.assertEqual(str(payment.subtotal), '3500.00')
+        self.assertEqual(str(payment.tax), '560.00')
+        self.assertEqual(str(payment.tip), '100.00')
+        self.assertEqual(str(payment.amount), '4160.00')
+
 class OperationsMVPTests(APITestCase):
     def setUp(self):
         self.owner=User.objects.create_user(username='owner',password='pass',role='owner')
@@ -204,3 +229,124 @@ class OperationsMVPTests(APITestCase):
         response=self.client.post('/api/payments/',{'booking':self.booking.pk,'method':'cash','payment_type':'deposit'},format='json')
         self.assertEqual(response.status_code,201)
         self.assertEqual(str(Payment.objects.get().amount),'300.00')
+
+    def test_public_booking_auto_assigns_an_available_treatment_room(self):
+        second_practitioner = User.objects.create_user(
+            username='room-practitioner', password='pass', role='practitioner'
+        )
+        self.service.location = self.location
+        self.service.save(update_fields=['location'])
+        self.client.force_authenticate(self.client_user)
+        response = self.client.post('/api/bookings/', {
+            'therapist': second_practitioner.pk,
+            'service': self.service.pk,
+            'date': (timezone.localdate() + timedelta(days=1)).isoformat(),
+            'time': '12:00:00',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Booking.objects.get(pk=response.data['id']).room, self.room)
+
+
+class PublicBookingAndRolesTests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='owner-public', password='pass', role='owner')
+        self.client_user = User.objects.create_user(
+            username='client-public', password='pass', role='client',
+            first_name='Zuri', last_name='Otieno',
+        )
+        self.practitioner = User.objects.create_user(
+            username='practitioner-public', password='pass', role='practitioner',
+            first_name='Faith', last_name='Wahome',
+        )
+        self.other_practitioner = User.objects.create_user(
+            username='other-practitioner', password='pass', role='practitioner'
+        )
+        self.service = Service.objects.create(
+            name='Public Massage', description='Bookable online', duration=60, price='4000.00'
+        )
+        self.future_date = timezone.localdate() + timedelta(days=3)
+        self.booking = Booking.objects.create(
+            client=self.client_user,
+            therapist=self.practitioner,
+            service=self.service,
+            date=self.future_date,
+            time=time(10),
+        )
+
+    def test_service_practitioner_and_business_catalogues_are_public(self):
+        self.assertEqual(self.client.get('/api/services/').status_code, status.HTTP_200_OK)
+        people = self.client.get('/api/users/therapists/')
+        self.assertEqual(people.status_code, status.HTTP_200_OK)
+        self.assertIn('Faith Wahome', [person['display_name'] for person in people.data])
+        self.assertEqual(self.client.get('/api/business/').status_code, status.HTTP_200_OK)
+
+    def test_current_user_returns_role_and_profile(self):
+        self.client.force_authenticate(self.client_user)
+        response = self.client.get('/api/auth/me/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['role'], 'client')
+        self.assertEqual(response.data['first_name'], 'Zuri')
+
+    def test_only_management_can_update_business_settings(self):
+        self.client.force_authenticate(self.client_user)
+        denied = self.client.patch('/api/business/', {'name': 'Not Allowed'}, format='json')
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+        self.client.force_authenticate(self.owner)
+        updated = self.client.patch('/api/business/', {'name': 'Wahome Wellness'}, format='json')
+        self.assertEqual(updated.status_code, status.HTTP_200_OK)
+        self.assertEqual(updated.data['name'], 'Wahome Wellness')
+
+    def test_practitioner_only_sees_their_assigned_schedule(self):
+        Booking.objects.create(
+            client=self.client_user,
+            therapist=self.other_practitioner,
+            service=self.service,
+            date=self.future_date,
+            time=time(12),
+        )
+        self.client.force_authenticate(self.practitioner)
+        response = self.client.get('/api/bookings/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item['id'] for item in response.data], [self.booking.id])
+
+    def test_booking_respects_working_hours_and_breaks(self):
+        Availability.objects.create(
+            staff=self.practitioner,
+            weekday=self.future_date.weekday(),
+            start_time=time(9),
+            end_time=time(17),
+        )
+        Availability.objects.create(
+            staff=self.practitioner,
+            weekday=self.future_date.weekday(),
+            start_time=time(12),
+            end_time=time(13),
+            is_break=True,
+        )
+        self.client.force_authenticate(self.client_user)
+        outside = self.client.post('/api/bookings/', {
+            'therapist': self.practitioner.pk,
+            'service': self.service.pk,
+            'date': self.future_date.isoformat(),
+            'time': '18:00:00',
+        }, format='json')
+        self.assertEqual(outside.status_code, status.HTTP_400_BAD_REQUEST)
+        during_break = self.client.post('/api/bookings/', {
+            'therapist': self.practitioner.pk,
+            'service': self.service.pk,
+            'date': self.future_date.isoformat(),
+            'time': '12:00:00',
+        }, format='json')
+        self.assertEqual(during_break.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_client_cancellation_respects_notice_period(self):
+        BusinessSettings.objects.create(cancellation_hours=96)
+        self.client.force_authenticate(self.client_user)
+        response = self.client.patch(
+            f'/api/bookings/{self.booking.pk}/status/',
+            {'status': 'cancelled'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, 'pending')

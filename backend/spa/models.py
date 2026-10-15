@@ -13,6 +13,35 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='client')
     phone = models.CharField(max_length=30, blank=True)
 
+
+class BusinessSettings(models.Model):
+    name = models.CharField(max_length=140, default='Serenity Spa')
+    tagline = models.CharField(max_length=180, default='Restore · Rebalance · Belong', blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    whatsapp_number = models.CharField(max_length=30, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    currency = models.CharField(max_length=3, default='KES')
+    timezone = models.CharField(max_length=60, default='Africa/Nairobi')
+    cancellation_hours = models.PositiveIntegerField(default=24)
+    cancellation_policy = models.TextField(
+        default='Please cancel or reschedule at least 24 hours before your appointment.',
+        blank=True,
+    )
+    no_show_fee_percent = models.PositiveIntegerField(default=50)
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    logo_url = models.URLField(blank=True)
+    hero_image_url = models.URLField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # This MVP represents one business while keeping locations separate.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
 class Location(models.Model):
     name = models.CharField(max_length=120)
     address = models.CharField(max_length=255, blank=True)
@@ -179,6 +208,8 @@ class Reminder(models.Model):
     scheduled_for = models.DateTimeField()
     sent_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=12, default='pending')
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
 
 class Subscription(models.Model):
     location = models.OneToOneField(Location, on_delete=models.CASCADE, related_name='subscription')

@@ -1,21 +1,22 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Booking, Payment, Service, User
+from .models import Booking, BusinessSettings, Payment, Service, User
 
 
 @admin.register(User)
 class SpaUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ("Spa", {"fields": ("role",)}),
+        ("Spa", {"fields": ("role", "phone")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ("Spa", {"fields": ("role",)}),
+        ("Spa", {"fields": ("role", "phone")}),
     )
 
 
 admin.site.register(Service)
 admin.site.register(Booking)
+admin.site.register(BusinessSettings)
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'booking', 'amount', 'method', 'status', 'receipt_number', 'date_paid')

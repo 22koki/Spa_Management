@@ -1,112 +1,190 @@
-# Spa Management MVP
+# Spa Management
 
-A full-stack spa booking MVP for clients, therapists, services, appointments, and payments. It pairs a Django REST API with a React single-page app and JWT authentication.
+A mobile-friendly spa operating system with three connected experiences:
 
-## MVP capabilities
+- Owner and reception workspace for today’s priorities, appointments, team capacity, clients, services, payments, and settings
+- Practitioner workspace for assigned schedules and service-delivery status updates
+- Branded public booking and customer dashboard for self-service appointments, payments, receipts, reminders, cancellation, and rebooking
 
-- Register and sign in as a client
-- Browse spa services and active therapists
-- Book a future service appointment
-- Prevent overlapping appointments for the same therapist
-- Scope booking visibility to each client's or therapist's own records
-- Give admins access to all bookings
-- Accept M-PESA STK, Till, card, and cash payment submissions
-- Confirm offline payments and print or save branded receipts as PDF
-- Schedule WhatsApp reminders and open pre-filled reminder chats from the owner workspace
+The first release is intentionally focused on workflows that make or protect revenue.
 
-## Stack
+## Sellable MVP included
 
-- Backend: Python 3.10+, Django 5, Django REST Framework, Simple JWT, PostgreSQL
+- Public branded online booking without requiring a customer to sign in first
+- Customer registration and JWT sign-in
+- Owner, manager, receptionist, practitioner, therapist, admin, and client roles
+- Role-aware menus, data access, and actions
+- Services with duration, price, deposit, cleanup buffer, preparation, aftercare, add-ons, and required skills
+- Team accounts, weekly availability, breaks, approved time off, locations, rooms, and equipment
+- Server-side conflict protection for practitioner time, room time, cleanup buffers, working hours, breaks, time off, and required skills
+- Client profiles with visit history, preferences, allergies, contraindications, private notes, consent, and loyalty points
+- Appointment statuses: pending, booked, confirmed, arrived, completed, cancelled, and no-show
+- Configurable cancellation/no-show policy
+- Deposits or full checkout with tax and optional tip
+- Cash and M-PESA Till verification by authorized staff
+- M-PESA STK and Flutterwave card gateway hooks when sandbox credentials are configured
+- Branded printable receipts
+- Action-first daily dashboard with sales, appointments, utilization, no-shows, confirmations, and rebooking follow-up
+- WhatsApp opt-in during booking, manual pre-filled customer chats, and automatic template reminder delivery
+- Business branding, contact details, currency, tax, cancellation policy, and integration readiness settings
+- Audit records for managed changes
+- Multi-location models even when the first release exposes one main location
+- Idempotent presentation data command
+
+## Technology
+
+- Backend: Python 3.10+, Django 5.2, Django REST Framework, Simple JWT
+- Database: SQLite for local development; PostgreSQL through `DATABASE_URL` in deployment
 - Frontend: React 19, React Router, Axios
 
-## Project layout
+## Start locally on Windows PowerShell
 
-```text
-backend/                 Django API
-  spa/                   Domain models, API views, serializers, tests
-  spa_backend/           Project settings and root URLs
-frontend/spa-frontend/   React application
+### 1. Backend
+
+```powershell
+cd C:\Users\MAKAVELI\Spa_Management\backend
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-## Local setup
+Open `backend\.env` and keep these local values:
 
-### 1. Database
-
-Create a PostgreSQL database and user matching the development settings in `backend/spa_backend/settings.py`. Never use development credentials in production.
-
-### 2. Backend
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
+```env
+DJANGO_SECRET_KEY=replace-this-with-a-long-random-local-secret
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
 ```
 
-The API runs at `http://127.0.0.1:8000/api/`.
+Then prepare the database and demo:
 
-### 3. Frontend
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py seed_demo --confirm
+.\.venv\Scripts\python.exe manage.py runserver
+```
 
-In a second terminal:
+The API will run at `http://127.0.0.1:8000/api/`.
 
-```bash
-cd frontend/spa-frontend
-npm ci
+### 2. Frontend
+
+Open a second PowerShell window:
+
+```powershell
+cd C:\Users\MAKAVELI\Spa_Management\frontend\spa-frontend
+Copy-Item .env.example .env
+npm install
 npm start
 ```
 
-The app runs at `http://localhost:3000`.
+Open `http://localhost:3000`. The public booking page is the default landing page.
 
-Copy `frontend/spa-frontend/.env.example` to `frontend/spa-frontend/.env` and set `REACT_APP_SPA_WHATSAPP_NUMBER` to the spa's WhatsApp number in international format (for example `254712345678`). This enables the floating customer-support chat button.
+## Demo accounts
 
-## Core API
+Run `seed_demo --confirm` as many times as needed; it is safe to repeat.
 
-| Method | Path | Purpose | Authentication |
-| --- | --- | --- | --- |
-| POST | `/api/auth/register/` | Register a client account | Public |
-| POST | `/api/auth/login/` | Obtain JWT access/refresh tokens | Public |
-| GET | `/api/services/` | List services | Public |
-| GET | `/api/users/therapists/` | List active therapists | JWT |
-| GET | `/api/bookings/` | List role-scoped bookings | JWT |
-| POST | `/api/bookings/` | Create a booking | Client JWT |
-| GET/POST | `/api/payments/` | List role-scoped payments or start payment | JWT |
-| POST | `/api/payments/{id}/confirm/` | Confirm a cash or Till payment | Admin JWT |
-| POST | `/api/payments/webhooks/mpesa/` | Receive a guarded Daraja result | Callback token |
-| POST | `/api/payments/webhooks/flutterwave/` | Receive and re-verify card result | Signature hash |
+| Experience | Username | Password |
+| --- | --- | --- |
+| Owner | `owner_demo` | `SpaDemo2026!` |
+| Reception | `reception_demo` | `SpaDemo2026!` |
+| Practitioner | `practitioner_demo` | `SpaDemo2026!` |
+| Customer | `client_demo` | `SpaDemo2026!` |
 
-Send authenticated requests with `Authorization: Bearer <access-token>`.
+Set `DEMO_PASSWORD` before running the command if you want a different shared demo password.
 
-## Booking security rules
+Suggested demo order:
 
-The API, rather than the browser, assigns the authenticated client and initial `pending` status. It rejects past appointments, non-therapist assignees, and overlapping active appointments. Booking lists are scoped by role, and creation is limited to client accounts. A database constraint provides a final guard against duplicate active start times.
+1. Open the public booking page and show the treatment/time/customer flow.
+2. Sign in as `owner_demo` and open **Today** to show actionable attention cards.
+3. Open **Team & Rooms** to show schedules, breaks, time off, locations, and resources.
+4. Open **Clients** to show allergy and contraindication warnings plus visit history.
+5. Open **Payments**, mark the seeded cash payment as paid, and open its branded receipt.
+6. Sign in as `practitioner_demo` and progress an appointment from confirmed to arrived to completed.
 
-## Tests
+## Payment behavior
 
-From `backend/` with a test database available:
+Only methods that are ready appear to customers:
 
-```bash
-python manage.py test spa
+- Cash and M-PESA Till are always available and remain pending until reception verifies them.
+- M-PESA STK appears after all `MPESA_*` variables in `backend/.env` are configured.
+- Card appears after `FLW_SECRET_KEY` and `FLW_REDIRECT_URL` are configured.
+- Gateway payments become paid only from a verified callback; the browser cannot self-confirm them.
+
+Use sandbox credentials until both successful and failed callback flows have been tested on a public HTTPS deployment. Payment amount, deposit, tax, and receipt state are owned by the server.
+
+## WhatsApp reminders
+
+Manual WhatsApp contact works when the business WhatsApp number is saved under **Settings**.
+
+For automatic reminders, configure the Meta WhatsApp Cloud API values in `backend/.env`:
+
+```env
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_TEMPLATE_NAME=appointment_reminder
+WHATSAPP_TEMPLATE_LANGUAGE=en
+WHATSAPP_GRAPH_VERSION=v26.0
 ```
 
-The suite covers authentication, ownership enforcement, role-based visibility, therapist validation, and overlap rejection.
+The approved template must accept these body values in order: customer name, service, appointment date, and appointment time.
 
-## MVP limitations / next steps
+Run due reminders manually:
 
-## Payment sandbox configuration
+```powershell
+.\.venv\Scripts\python.exe manage.py send_due_reminders
+```
 
-Copy `backend/.env.example` to `backend/.env`, then add Daraja sandbox and Flutterwave test credentials. Django loads this file automatically. Never commit the real values.
+For deployment, schedule this command every five minutes using the host’s cron/background-worker service. Failed deliveries are retained with an attempt count and error message and retry up to three times.
 
-Generate a fresh Django secret for `DJANGO_SECRET_KEY` before deployment and set `DJANGO_DEBUG=False` with the deployed API hostname in `DJANGO_ALLOWED_HOSTS`.
+## Verification
 
-M-PESA and Flutterwave callbacks require a public HTTPS API URL. Cash and Till submissions remain pending until a staff member confirms them in Django Admin. Successful payments receive a unique receipt number; clients can open the receipt from Payment History and use **Print / Save as PDF**.
+Backend:
 
-Use only sandbox/test credentials until the complete callback flow has passed testing. The server derives payment amounts from bookings, limits clients to their own bookings, rejects reused Till transaction codes, verifies Flutterwave transactions with the provider, and generates receipts only after confirmed payment.
+```powershell
+cd backend
+.\.venv\Scripts\python.exe manage.py check
+.\.venv\Scripts\python.exe manage.py test spa
+```
 
-- Add server-side refresh-token revocation on logout
-- Move secrets and database credentials to environment variables before deployment
-- Add therapist working hours, time-zone-aware availability, cancellation, and rescheduling
-- Add CORS configuration when frontend and API use different origins
-- Remove committed virtual-environment files and rotate credentials previously committed to Git history
+Frontend:
+
+```powershell
+cd frontend\spa-frontend
+npm run build
+```
+
+The current automated suite contains 24 backend workflow/security tests, and the React production build must compile without errors before release.
+
+## Production checklist
+
+- Set `DJANGO_DEBUG=False` and a new high-entropy `DJANGO_SECRET_KEY`.
+- Set the deployed API hostname in `DJANGO_ALLOWED_HOSTS`.
+- Set exact frontend domains in `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`.
+- Use managed PostgreSQL through `DATABASE_URL`.
+- Set `REACT_APP_API_URL` to the public HTTPS API before building the frontend.
+- Configure public HTTPS payment callback URLs and provider webhook secrets.
+- Configure the WhatsApp template and recurring reminder worker.
+- Create named staff accounts; do not share the demo password in production.
+- Back up the database and verify restore, payment callback, reminder, cancellation, and receipt flows.
+- Run `python manage.py check --deploy` against the production environment.
+
+## API highlights
+
+| Method | Path | Purpose | Access |
+| --- | --- | --- | --- |
+| GET | `/api/business/` | Public brand, policy, and ready payment methods | Public |
+| PATCH | `/api/business/` | Update business configuration | Owner/manager/admin |
+| POST | `/api/auth/register/` | Register a customer | Public |
+| POST | `/api/auth/login/` | Obtain access and refresh tokens | Public |
+| GET/PATCH | `/api/auth/me/` | Current account profile | Authenticated |
+| GET | `/api/services/` | Public treatment catalogue | Public |
+| GET | `/api/users/therapists/` | Active practitioners | Public |
+| GET/POST | `/api/bookings/` | Role-scoped appointment list or customer booking | Authenticated |
+| PATCH | `/api/bookings/{id}/status/` | Authorized workflow/cancellation update | Authenticated |
+| GET/POST | `/api/payments/` | Role-scoped payments or checkout | Authenticated |
+| POST | `/api/payments/{id}/confirm/` | Verify cash or Till payment | Authorized staff |
+| GET | `/api/reports/dashboard/` | Operational dashboard | Owner/manager/reception |
+
+## Scope boundary
+
+This repository is a complete first sellable release, not the entire long-term product roadmap. Packages, recurring memberships, gift-card liability, inventory purchasing, payroll execution, marketing campaigns, media consent storage, and full subscription billing should be built as separate production modules after real client validation. Their financial and privacy rules should not be represented by non-functional demo buttons.

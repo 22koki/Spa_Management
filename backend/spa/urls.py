@@ -12,7 +12,9 @@ for prefix, view in [('locations',LocationViewSet),('rooms',RoomViewSet),('skill
 
 urlpatterns = [
     path('',include(router.urls)),
+    path('business/', BusinessSettingsView.as_view(), name='business-settings'),
     path('services/', ServiceListCreate.as_view()),
+    path('services/<int:pk>/', ServiceDetail.as_view(), name='service-detail'),
     path('bookings/', BookingListCreate.as_view()),
     path('bookings/<int:pk>/status/', booking_status),
     path('reports/dashboard/', dashboard_report),
@@ -25,6 +27,7 @@ urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/me/', CurrentUserView.as_view(), name='current-user'),
 
     path('users/therapists/', therapist_list, name='therapists'),
 ]
